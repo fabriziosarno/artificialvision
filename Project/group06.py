@@ -78,11 +78,11 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     - None
     """
     # Number of frames to wait before updating tracking information
-    frames_to_wait = fps * 1.6
+    frames_to_wait = fps * 1.5
     frame_counter = frames_to_wait
 
     # Adapting OpenCV video window
-    # cv2.namedWindow("YOLOv8 Tracking + PAR", cv2.WINDOW_KEEPRATIO)
+    cv2.namedWindow("YOLOv8 Tracking + PAR", cv2.WINDOW_KEEPRATIO)
 
     while True:
         # Read the next frame from the video
@@ -177,8 +177,12 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
         # Roi attributes update
         if is_in_roi1:
             update_roi_statistic(tracking_data, obj_id, "roi1")
-        elif is_in_roi2:
+        else:
+            tracking_data[obj_id]['roi1_flag'] == False
+        if is_in_roi2:
             update_roi_statistic(tracking_data, obj_id, "roi2")
+        else:
+            tracking_data[obj_id]['roi2_flag'] == False
 
 
 def update_roi_statistic(tracking_data, obj_id, roi):
@@ -243,7 +247,7 @@ def calculate_bbox_info(results, mapper, id_counter):
             cy = int((y1 + y2) / 2)
 
             # Convert track_id to a string in the format "id_x"
-            track_id_str = f"ID {int(track_id)}"
+            track_id_str = f"id_{int(track_id)}"
 
             # Aggiornamento counter sequenziale
             if track_id_str not in mapper:
@@ -269,6 +273,12 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
     Returns:
     - numpy.ndarray: Frame with drawn bounding boxes and labels.
     """
+
+    hat = None
+    bag = None
+    upper_color = None
+    lower_color = None
+
     for info in bbinfo:
         obj_id = info[0]
         angles = info[2]
@@ -292,17 +302,41 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
         gender_label_position = (x2 + 2, y1 + 15)
         cv2.putText(frame, f"Gender: {tracking_info.get('gender', 0)}", gender_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
 
+        if tracking_info.get('hat', 0) == 'yes' or tracking_info.get('hat', 0) == 'true':
+            hat = 'true'
+        elif tracking_info.get('hat', 0) == 'no' or tracking_info.get('hat', 0) == 'false':
+            hat = 'false'
+
         hat_label_position = (x2 + 2, y1 + 30)
-        cv2.putText(frame, f"Hat: {tracking_info.get('hat', 0)}", hat_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        cv2.putText(frame, f"Hat: {hat}", hat_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+
+        if tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
+            bag = 'true'
+        elif tracking_info.get('bag', 0) == 'no' or tracking_info.get('bag', 0) == 'false':
+            bag = 'false'
 
         bag_label_position = (x2 + 2, y1 + 45)
-        cv2.putText(frame, f"Bag: {tracking_info.get('bag', 0)}", bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        cv2.putText(frame, f"Bag: {bag}", bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+
+        if tracking_info.get("upper_color", 0) == 'tan':
+            upper_color = 'brown'
+        elif tracking_info.get("upper_color", 0) == 'black and white':
+            upper_color = 'black'
+        else:
+            upper_color = tracking_info.get("upper_color", 0)
 
         upcol_label_position = (x2 + 2, y1 + 60)
-        cv2.putText(frame, f"Upper Color: {tracking_info.get('upper_color', 0)}", upcol_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        cv2.putText(frame, f"Upper Color: {upper_color}", upcol_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+
+        if tracking_info.get("lower_color", 0) == 'tan':
+            lower_color = 'brown'
+        elif tracking_info.get("lower_color", 0) == 'black and white':
+            lower_color = 'black'
+        else:
+            lower_color = tracking_info.get("lower_color", 0)
 
         lowcol_label_position = (x2 + 2, y1 + 75)
-        cv2.putText(frame, f"Lower Color: {tracking_info.get('lower_color', 0)}", lowcol_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        cv2.putText(frame, f"Lower Color: {lower_color}", lowcol_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
 
     return frame
 
@@ -328,7 +362,6 @@ def crop_objects(frame, id, angles):
 
     return cropped_image
 
-
 def save_tracking_statistics(tracking_data, output_file, fps, mapper):
     """
     Save tracking statistics for each object in the tracking data to a JSON file.
@@ -340,15 +373,47 @@ def save_tracking_statistics(tracking_data, output_file, fps, mapper):
     - mapper: data structure used to map used IDs
     """
     output_list = []
+    hat = None
+    bag = None
+    upper_color = None
+    lower_color = None
 
     for obj_id, data in tracking_data.items():
+
+        # Hat, bag, upper color and lower color final value management
+
+        if data.get("hat", False) == 'yes' or data.get("hat", False) == 'true':
+            hat = True
+        elif data.get("hat", False) == 'no' or data.get("hat", False) == 'false':
+            hat = False
+
+        if data.get("bag", False) == 'yes' or data.get("bag", False) == 'true':
+            bag = True
+        elif data.get("bag", False) == 'no' or data.get("bag", False) == 'false':
+            bag = False
+
+        if data.get("upper_color", False) == 'tan':
+            upper_color = 'brown'
+        elif data.get("upper_color", False) == 'black and white':
+            upper_color = 'black'
+        else:
+            upper_color = data.get("upper_color", False)
+            
+        if data.get("lower_color", False) == 'tan':
+            lower_color = 'brown'
+        elif data.get("lower_color", False) == 'black and white':
+            lower_color = 'black'
+        else:
+            lower_color = data.get("lower_color", False)
+
+
         entry = {
             "id": mapper[obj_id],
             "gender": data.get("gender", "unknown"),
-            "hat": data.get("hat", False),
-            "bag": data.get("bag", False),
-            "upper_color": data.get("upper_color", "unknown"),
-            "lower_color": data.get("lower_color", "unknown"),
+            "hat": hat,
+            "bag": bag,
+            "upper_color": upper_color,
+            "lower_color": lower_color,
             "roi1_passages": data.get("roi1_passages", 0),
             "roi1_persistence_time": round(data.get("roi1_persistence_time", 0) / fps, 2),
             "roi2_passages": data.get("roi2_passages", 0),
@@ -393,6 +458,7 @@ def main():
         # Load MTNN model
         mtnn_model_path = 'multitask_model/mtnn_best_model.pth'
         mtnn_model = load_mtnn(mtnn_model_path)
+        mtnn_model.to("cuda")
         par_model = mtnn_model
 
 

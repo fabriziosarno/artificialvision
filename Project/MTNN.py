@@ -110,7 +110,7 @@ class MultiTaskPAR:
         Returns:
             tuple: Extracted attributes - gender, hat, bag, top color, bottom color.
         """
-        input_tensor = self.image_preprocessing(image).unsqueeze(0).to("cuda") if torch.cuda.is_available() else self.image_preprocessing(image).unsqueeze(0).to("cpu")
+        input_tensor = self.image_preprocessing(image).unsqueeze(0).to("cuda")
 
         with torch.no_grad():
             outputs = self.model(input_tensor)

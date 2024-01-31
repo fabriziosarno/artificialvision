@@ -65,17 +65,7 @@ class ViLTPAR:
                     outputs = self.model(**a)
                     logits = outputs.logits
                     idx = logits.argmax(-1).item()
-
-                    # Modify labels for binary attributes (hat and bag)
-                    if i == 1 or i == 2:
-                        if str(self.model.config.id2label[idx]).lower() == 'yes' or 'true':
-                            self.model.config.id2label[idx] = True
-                        elif str(self.model.config.id2label[idx]).lower() == 'no' or 'false':
-                            self.model.config.id2label[idx] = False
-                    if i == 3 or i == 4:
-                        if str(self.model.config.id2label[idx]).lower() == 'tan':
-                            self.model.config.id2label[idx] = "brown"
-                    feature_list.append(self.model.config.id2label[idx])
+                    feature_list.append(str(self.model.config.id2label[idx]).lower())
 
         except Exception as e:
             print("Error occurred --- ", e)
