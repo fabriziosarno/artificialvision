@@ -10,25 +10,26 @@ All the design and implementation material can be found inside the 'Project' fol
 - **MTNN.py**: python script file for the Multi-Task Neural Network class implementing the Multi-Task model
 - **MTNN_Training.ipynb**: Jupyter notebook containing all the code used for the Multi-Task Neural Network training
 - **roi.py**: python script file which uses the 'config.txt' file to display the two ROIs on the video
-- **group06.py**: python main script file which implements all the reasoning for tracking with YOLOv8 and PAR with ViLT
+- **video_processing.py**: python script file which implements all the reasoning for tracking with YOLOv8 and PAR with ViLT
+- **group06.py**: python main script used to run the entire project code
 - **vilt.py**: python script file that implements the ViLT pretrained model for Visual Question Answering applied to Pedestrian Attribute Recognition
 
 Inside the main function in 'tracking.py' file there's a boolean flag called 'vilt'. You can set this flag to 'True' if you want to run Pedestrian Attribute Recognition using ViLT model, otherwise to 'False' if you want to run it with the Multi-Task model
 
 ## Github repository
-Here's the [Github repository link](https://github.com/fabriziosarno/artificialvision), where you can find code written and used for the project implementation.
+Here's the [Github repository link](https://github.com/antoineb1/Artificial_vision), where you can find code written and used for the project implementation.
 
 ## Credits
 The project has been designed and realized by Artificial Vision Group 06
 
-### Members and references:
+- Members and references:
   - Antoine Barbet - [a.barbet1@studenti.unisa.it](mailto:a.barbet1@studenti.unisa.it)
   - Marco Milone - [m.milone15@studenti.unisa.it](mailto:m.milone15@studenti.unisa.it)
   - Martina Napoli - [m.napoli81@studenti.unisa.it](mailto:m.napoli81@studenti.unisa.it)
   - Fabrizio Sarno - [f.sarno14@studenti.unisa.it](mailto:f.sarno14@studenti.unisa.it)
 
-### Data
+- Data
   For the Multi-Task model training, [MIVIA](https://mivia.unisa.it/) dataset has been used.
 
-### Institution
+- Institution
   [University of Salerno](https://web.unisa.it/en/university), DIEM, MIVIA
