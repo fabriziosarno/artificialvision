@@ -78,8 +78,9 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     - None
     """
     # Number of frames to wait before updating tracking information
-    frames_to_wait = fps * 1.5
+    frames_to_wait = fps * 2.5
     frame_counter = frames_to_wait
+    tot_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     # Adapting OpenCV video window
     cv2.namedWindow("YOLOv8 Tracking + PAR", cv2.WINDOW_KEEPRATIO)
@@ -87,6 +88,7 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     while True:
         # Read the next frame from the video
         success, frame = cap.read()
+        current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
 
         # Break the loop if no more frames
         if not success:
@@ -99,7 +101,7 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
         bbinfo, id_counterer = calculate_bbox_info(results, mapper, id_counterer)
 
         # Decide whether to perform attribute extraction in the current frame
-        if frame_counter >= frames_to_wait:
+        if frame_counter >= frames_to_wait or current_frame == tot_frames:
             flag_par = True
             frame_counter = 0
         else:
@@ -178,11 +180,11 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
         if is_in_roi1:
             update_roi_statistic(tracking_data, obj_id, "roi1")
         else:
-            tracking_data[obj_id]['roi1_flag'] == False
+            tracking_data[obj_id]['roi1_flag'] = False
         if is_in_roi2:
             update_roi_statistic(tracking_data, obj_id, "roi2")
         else:
-            tracking_data[obj_id]['roi2_flag'] == False
+            tracking_data[obj_id]['roi2_flag'] = False
 
 
 def update_roi_statistic(tracking_data, obj_id, roi):
@@ -279,7 +281,10 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
     upper_color = None
     lower_color = None
 
+    labeling_color = None
+
     for info in bbinfo:
+
         obj_id = info[0]
         angles = info[2]
 
@@ -290,55 +295,118 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
 
         tracking_info = tracking_data.get(obj_id, {})
 
+        # Draw general info box
+        h, w, c = frame.shape
+        w = round((w / 100) * 19)
+        h = round((h / 50) * 9)
+
+        frame = cv2.rectangle(frame, (0, 0), (w, h), (255, 255, 255), -1)
+        general_info = get_general_info(bbinfo, tracking_data)
+        cv2.putText(frame, f'People in ROI: {general_info[0]}', (7, 30), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+        cv2.putText(frame, f'Total persons: {general_info[1]}', (7, 80), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+        cv2.putText(frame, f'Passages in ROI 1: {general_info[2]}', (7, 130), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+        cv2.putText(frame, f'Passages in ROI 2: {general_info[3]}', (7, 180), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+
         # Draw the bounding box in red
-        cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 255), 2)
+        if tracking_info['roi1_flag'] == True and tracking_info['roi2_flag'] == False:
+            labeling_color = (255, 0, 0)
+        elif tracking_info['roi1_flag'] == False and tracking_info['roi2_flag'] == True:
+            labeling_color = (0, 255, 0)
+        elif tracking_info['roi1_flag'] == False and tracking_info['roi2_flag'] == False:
+            labeling_color = (0, 0, 255)
+        
+        frame = cv2.rectangle(frame, (x1, y1), (x2, y2), labeling_color, 3)
 
         # Add label with ID above the box (ID as an integer)
-        id = "id_" + str(mapper[obj_id])
-        id_label_position = (x1, y1 - 10)
-        cv2.putText(frame, id, id_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.5, (0, 0, 0), 1)
+        id = str(mapper[obj_id])
+        id_label_position = (x1 + 5, y1 + 25)
+        frame = cv2.rectangle(frame, (x1, y1), (x1 + 40, y1 + 40), (255, 255, 255), -1)
+        cv2.putText(frame, id, id_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, labeling_color, 2)
 
-        # Add label with PAR attributes on the right of the box
-        gender_label_position = (x2 + 2, y1 + 15)
-        cv2.putText(frame, f"Gender: {tracking_info.get('gender', 0)}", gender_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        # Add label with PAR attributes below the box
+        bound_w = x2 - x1
+        bound_h = y2 - y1
+
+        rect_w = 250
+        rect_h = 100
+
+        rect_x = round(x1 + bound_w / 2 - rect_w / 2)
+        rect_y = y2
+
+        frame = cv2.rectangle(frame, (rect_x, rect_y), (rect_x + rect_w, rect_y + rect_h), (255, 255, 255), -1)
+
+        if tracking_info.get('gender', 0) == 'male':
+            gender = 'M'
+        elif tracking_info.get('gender', 0) == 'female':
+            gender = 'F'
+        else:
+            gender = 'ND'
+
+        gender_label_position = (rect_x + 7, rect_y + 30)
+        cv2.putText(frame, f"Gender: {gender}", gender_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
 
         if tracking_info.get('hat', 0) == 'yes' or tracking_info.get('hat', 0) == 'true':
-            hat = 'true'
+            hat = 'Hat'
         elif tracking_info.get('hat', 0) == 'no' or tracking_info.get('hat', 0) == 'false':
-            hat = 'false'
-
-        hat_label_position = (x2 + 2, y1 + 30)
-        cv2.putText(frame, f"Hat: {hat}", hat_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+            hat = 'No Hat'
 
         if tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
-            bag = 'true'
+            bag = 'Bag'
         elif tracking_info.get('bag', 0) == 'no' or tracking_info.get('bag', 0) == 'false':
-            bag = 'false'
+            bag = 'No Bag'
 
-        bag_label_position = (x2 + 2, y1 + 45)
-        cv2.putText(frame, f"Bag: {bag}", bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        hat_bag_label_position = (rect_x + 7, rect_y + 60)
+        cv2.putText(frame, f"{hat} {bag}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
 
         if tracking_info.get("upper_color", 0) == 'tan':
-            upper_color = 'brown'
+            upper_color = 'Brown'
         elif tracking_info.get("upper_color", 0) == 'black and white':
-            upper_color = 'black'
+            upper_color = 'Black'
         else:
             upper_color = tracking_info.get("upper_color", 0)
 
-        upcol_label_position = (x2 + 2, y1 + 60)
-        cv2.putText(frame, f"Upper Color: {upper_color}", upcol_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
-
         if tracking_info.get("lower_color", 0) == 'tan':
-            lower_color = 'brown'
+            lower_color = 'Brown'
         elif tracking_info.get("lower_color", 0) == 'black and white':
-            lower_color = 'black'
+            lower_color = 'Black'
         else:
             lower_color = tracking_info.get("lower_color", 0)
 
-        lowcol_label_position = (x2 + 2, y1 + 75)
-        cv2.putText(frame, f"Lower Color: {lower_color}", lowcol_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.4, (255, 255, 255), 1)
+        color_label_position = (rect_x + 7, rect_y + 90)
+        cv2.putText(frame, f"U-L: {upper_color}-{lower_color}", color_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
 
     return frame
+
+def get_general_info(bbinfo, tracking_data):
+
+    """
+    Helps to extract all the general info to show during the video processing.
+
+    Parameters
+    - bbinfo (list): List containing information about bounding boxes.
+    - tracking_data (dict): Dictionary containing tracking information.
+
+    Returns
+    - list of extracted information
+    """
+
+    people_in_roi = 0
+    tot_people = 0
+    roi1_passages = 0
+    roi2_passages = 0 
+
+    for id in tracking_data:
+        tot_people = len(bbinfo)        
+        info = tracking_data.get(id, {})
+
+        if info['roi1_flag'] or info['roi2_flag']:
+            people_in_roi += 1
+        
+        roi1_passages += info['roi1_passages']
+        roi2_passages += info['roi2_passages']
+
+    return [people_in_roi, tot_people, roi1_passages, roi2_passages]
+            
 
 def crop_objects(frame, id, angles):
     """

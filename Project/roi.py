@@ -52,17 +52,17 @@ class ROI:
         Parameters:
         - image (numpy.ndarray): Image to which ROIs will be added.
         """
-        for i, (roi_name, roi_info) in enumerate(self.rois.items()):
+        for roi_name, roi_info in self.rois.items():
             x_abs, y_abs, width_abs, height_abs = roi_info["x_abs"], roi_info["y_abs"], roi_info["width_abs"], roi_info["height_abs"]
 
-            # Green color for the first ROI, blue for the second
-            color = (0, 180, 0) if i == 0 else (180, 0, 0)
+            # Black color for the both ROIs
+            color = (0, 0, 0)
 
             # Draw rectangle
-            cv2.rectangle(image, (x_abs, y_abs), (x_abs + width_abs, y_abs + height_abs), color, 2)
+            cv2.rectangle(image, (x_abs, y_abs), (x_abs + width_abs, y_abs + height_abs), color, 3)
 
-            label_position = (x_abs + 5, y_abs + 20)
-            cv2.putText(image, roi_name, label_position, cv2.FONT_HERSHEY_COMPLEX, 0.4, color, 1)
+            label_position = (x_abs + 10, y_abs + 30)
+            cv2.putText(image, roi_name[3], label_position, cv2.FONT_HERSHEY_DUPLEX, 1.0, color, 2)
 
     def point_in_rois(self, point):
         """

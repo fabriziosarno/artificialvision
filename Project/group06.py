@@ -1,4 +1,4 @@
-import argparse
+import argparse, time
 from video_processing import *
 
 
@@ -57,4 +57,9 @@ def main():
     save_tracking_statistics(tracking_data, args.results, fps, mapper)
 
 if __name__ == "__main__":
+
+    start = time.time()
     main()
+    end = time.time()
+
+    print(f"Execution time (sec - mins): {(end - start)} {round((end - start) / 60)}")
