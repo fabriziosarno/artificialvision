@@ -75,10 +75,11 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     - id_counter: counter of IDs
     """
     # Number of frames to wait before updating tracking information
-    frames_to_wait = fps * 6.5
-    frame_counter = frames_to_wait
-    tot_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    prev_people = 0
+    frames_to_wait = 30
+    prev_id_counter = id_counter
+    par_counter = 0
+    start_count = False
+    flag_par = False
 
     # Adapting OpenCV video window
     cv2.namedWindow("YOLOv8 Tracking + PAR", cv2.WINDOW_KEEPRATIO)
@@ -86,7 +87,6 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     while True:
         # Read the next frame from the video
         success, frame = cap.read()
-        current_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
 
         # Break the loop if no more frames
         if not success:
@@ -97,22 +97,28 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
 
         # Compute bounding box informations
         bbinfo, id_counter = calculate_bbox_info(results, mapper, id_counter)
-        curr_people = len(bbinfo)
-
-        # Decide whether to perform attribute extraction in the current frame
-        if curr_people != prev_people or current_frame == tot_frames:
-            prev_people = curr_people
-            flag_par = True
-            frame_counter = 0
-        # if frame_counter >= frames_to_wait or current_frame == tot_frames:
-        #     flag_par = True
-        #     frame_counter = 0
+        
+        if id_counter != prev_id_counter:
+            print("Parte il contatore")
+            start_count = True
+            prev_id_counter = id_counter
+            par_counter = 0  # Aggiunto per resettare il contatore quando cambia l'id_counter
+        if start_count:
+            par_counter += 1
+            if par_counter >= frames_to_wait:
+                flag_par = True
+                par_counter = 0
+                start_count = False
+                print("SOLO ORA FACCIO PAR")
         else:
-            flag_par = False
-            frame_counter += 1
+            # Se un nuovo ID entra prima che il contatore scada, resetta il contatore e la logica
+            par_counter = 0
+            start_count = False
+
+        print("PAR COUNTER",par_counter)
 
         # Update tracking data based on the current frame
-        update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par)
+        flag_par = update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par)
 
         # Display the annotated frame with bounding boxes and ROIs
         annotated_frame = plot_bboxes(bbinfo, tracking_data, frame, mapper)
@@ -150,7 +156,6 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
         # Check if the center of the box is in one of the two ROIs
         is_in_roi1, is_in_roi2 = rois.point_in_rois((centers[0], centers[1]))
 
-
         if obj_id not in tracking_data:
             # Initialize tracking data for the object ID
             tracking_data[obj_id] = {
@@ -168,7 +173,6 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
             }
 
         if flag_par:
-
             #Extraction of the crop for each person
             cropped_frame = crop_objects(frame, obj_id, angles)
             attributes = par_model.extract_attributes(cropped_frame)
@@ -189,6 +193,8 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
         else:
             tracking_data[obj_id]['roi2_flag'] = False
 
+    flag_par = False
+    return flag_par
 
 def update_roi_statistic(tracking_data, obj_id, roi):
     """
@@ -356,10 +362,20 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
             bag = 'Bag'
         elif tracking_info.get('bag', 0) == 'no' or tracking_info.get('bag', 0) == 'false':
             bag = 'No Bag'
+        
 
         hat_bag_label_position = (rect_x + 7, rect_y + 60)
-        cv2.putText(frame, f"{hat} {bag}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
 
+        if bag == 'Bag' and hat == 'Hat':
+            cv2.putText(frame, f"{bag} {hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        elif bag == 'No Bag' and hat == 'No Hat':
+            cv2.putText(frame, f"{bag} {hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        elif bag == 'Bag' and hat == 'No Hat':
+            cv2.putText(frame, f"{bag}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        elif hat == 'Hat' and bag == 'No Bag':
+            cv2.putText(frame, f"{hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        else: 
+            cv2.putText(frame, f"{bag} {hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
         if tracking_info.get("upper_color", 0) == 'tan':
             upper_color = 'Brown'
         elif tracking_info.get("upper_color", 0) == 'black and white':
@@ -368,9 +384,9 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
             upper_color = tracking_info.get("upper_color", 0)
 
         if tracking_info.get("lower_color", 0) == 'tan':
-            lower_color = 'Brown'
+            lower_color = 'brown'
         elif tracking_info.get("lower_color", 0) == 'black and white':
-            lower_color = 'Black'
+            lower_color = 'black'
         else:
             lower_color = tracking_info.get("lower_color", 0)
 
