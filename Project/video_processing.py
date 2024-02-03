@@ -60,7 +60,7 @@ def open_video(video_path):
     return cap
 
 
-def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper, id_counterer):
+def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper, id_counter):
     """
     Process frames from the video, update tracking data, and display the annotated frames.
 
@@ -72,15 +72,13 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     - tracking_data (dict): Dictionary to store tracking data.
     - fps (int): Frames per second of the video.
     - mapper: data structure used to map used IDs
-    - id_counterer: counter of IDs
-
-    Returns:
-    - None
+    - id_counter: counter of IDs
     """
     # Number of frames to wait before updating tracking information
-    frames_to_wait = fps * 2.5
+    frames_to_wait = fps * 6.5
     frame_counter = frames_to_wait
     tot_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    prev_people = 0
 
     # Adapting OpenCV video window
     cv2.namedWindow("YOLOv8 Tracking + PAR", cv2.WINDOW_KEEPRATIO)
@@ -98,12 +96,17 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
         results = yolo_model.track(frame, persist=True, classes=0, verbose=False, tracker="yolo_trackers/custom.yaml")
 
         # Compute bounding box informations
-        bbinfo, id_counterer = calculate_bbox_info(results, mapper, id_counterer)
+        bbinfo, id_counter = calculate_bbox_info(results, mapper, id_counter)
+        curr_people = len(bbinfo)
 
         # Decide whether to perform attribute extraction in the current frame
-        if frame_counter >= frames_to_wait or current_frame == tot_frames:
+        if curr_people != prev_people or current_frame == tot_frames:
+            prev_people = curr_people
             flag_par = True
             frame_counter = 0
+        # if frame_counter >= frames_to_wait or current_frame == tot_frames:
+        #     flag_par = True
+        #     frame_counter = 0
         else:
             flag_par = False
             frame_counter += 1
@@ -220,7 +223,7 @@ def calculate_bbox_info(results, mapper, id_counter):
     Parameters:
     - results (ultralytics.YOLO): YOLO results object containing information about detected objects.
     - mapper: data structure used to map used IDs
-    - id_counterer: counter of IDs
+    - id_counter: counter of IDs
 
     Returns:
     - list: List of tuples, each containing the track ID and coordinates of the center and the corners of a bounding box ("id_x", (cx, cy), (x1, y1, x2, y2)).
@@ -283,6 +286,18 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
 
     labeling_color = None
 
+    # Draw general info box
+    h, w, c = frame.shape
+    w = round((w / 100) * 19)
+    h = round((h / 50) * 9)
+
+    frame = cv2.rectangle(frame, (0, 0), (w, h), (255, 255, 255), -1)
+    general_info = get_general_info(bbinfo, tracking_data)
+    cv2.putText(frame, f'People in ROI: {general_info[0]}', (7, 30), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+    cv2.putText(frame, f'Total persons: {general_info[1]}', (7, 80), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+    cv2.putText(frame, f'Passages in ROI 1: {general_info[2]}', (7, 130), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+    cv2.putText(frame, f'Passages in ROI 2: {general_info[3]}', (7, 180), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+
     for info in bbinfo:
 
         obj_id = info[0]
@@ -294,18 +309,6 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
         y2 = angles[3]
 
         tracking_info = tracking_data.get(obj_id, {})
-
-        # Draw general info box
-        h, w, c = frame.shape
-        w = round((w / 100) * 19)
-        h = round((h / 50) * 9)
-
-        frame = cv2.rectangle(frame, (0, 0), (w, h), (255, 255, 255), -1)
-        general_info = get_general_info(bbinfo, tracking_data)
-        cv2.putText(frame, f'People in ROI: {general_info[0]}', (7, 30), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
-        cv2.putText(frame, f'Total persons: {general_info[1]}', (7, 80), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
-        cv2.putText(frame, f'Passages in ROI 1: {general_info[2]}', (7, 130), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
-        cv2.putText(frame, f'Passages in ROI 2: {general_info[3]}', (7, 180), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
 
         # Draw the bounding box in red
         if tracking_info['roi1_flag'] == True and tracking_info['roi2_flag'] == False:
@@ -325,7 +328,6 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
 
         # Add label with PAR attributes below the box
         bound_w = x2 - x1
-        bound_h = y2 - y1
 
         rect_w = 250
         rect_h = 100
@@ -377,6 +379,23 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
 
     return frame
 
+# def plot_general_info(bbinfo, tracking_data, width, height):
+#     """
+#     Plot the general info box on the top left of the video.
+
+#     Parameters
+#     - bbinfo (list): List containing information about bounding boxes.
+#     - tracking_data (dict): Dictionary containing tracking information.
+#     - width (int): box width
+#     - height (int): box height
+#     """
+#     frame = cv2.rectangle(frame, (0, 0), (width, height), (255, 255, 255), -1)
+#     general_info = get_general_info(bbinfo, tracking_data)
+#     cv2.putText(frame, f'People in ROI: {general_info[0]}', (7, 30), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+#     cv2.putText(frame, f'Total persons: {general_info[1]}', (7, 80), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+#     cv2.putText(frame, f'Passages in ROI 1: {general_info[2]}', (7, 130), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+#     cv2.putText(frame, f'Passages in ROI 2: {general_info[3]}', (7, 180), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
+
 def get_general_info(bbinfo, tracking_data):
 
     """
@@ -395,9 +414,9 @@ def get_general_info(bbinfo, tracking_data):
     roi1_passages = 0
     roi2_passages = 0 
 
-    for id in tracking_data:
+    for info in bbinfo:
         tot_people = len(bbinfo)        
-        info = tracking_data.get(id, {})
+        info = tracking_data.get(info[0], {})
 
         if info['roi1_flag'] or info['roi2_flag']:
             people_in_roi += 1

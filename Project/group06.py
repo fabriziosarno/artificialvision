@@ -17,7 +17,7 @@ def main():
     args = parser.parse_args()
 
     # Load YOLO model
-    yolo_model_path = 'yolo_models/yolov8s.pt'
+    yolo_model_path = 'yolo_models/yolov8n.pt'
     yolo_model = load_yolo(yolo_model_path)
     yolo_model.to("cuda")
 
