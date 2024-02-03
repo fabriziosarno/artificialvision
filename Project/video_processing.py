@@ -99,23 +99,19 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
         bbinfo, id_counter = calculate_bbox_info(results, mapper, id_counter)
         
         if id_counter != prev_id_counter:
-            print("Parte il contatore")
             start_count = True
             prev_id_counter = id_counter
-            par_counter = 0  # Aggiunto per resettare il contatore quando cambia l'id_counter
+            par_counter = 0  # Reset PAR counter whenever id_counter changes
         if start_count:
             par_counter += 1
             if par_counter >= frames_to_wait:
                 flag_par = True
                 par_counter = 0
                 start_count = False
-                print("SOLO ORA FACCIO PAR")
         else:
-            # Se un nuovo ID entra prima che il contatore scada, resetta il contatore e la logica
+            # If a new ID enters the scene before counter elapses, reset counter and logic
             par_counter = 0
             start_count = False
-
-        print("PAR COUNTER",par_counter)
 
         # Update tracking data based on the current frame
         flag_par = update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par)
@@ -351,31 +347,20 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
             gender = 'ND'
 
         gender_label_position = (rect_x + 7, rect_y + 30)
-        cv2.putText(frame, f"Gender: {gender}", gender_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-
-        if tracking_info.get('hat', 0) == 'yes' or tracking_info.get('hat', 0) == 'true':
-            hat = 'Hat'
-        elif tracking_info.get('hat', 0) == 'no' or tracking_info.get('hat', 0) == 'false':
-            hat = 'No Hat'
-
-        if tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
-            bag = 'Bag'
-        elif tracking_info.get('bag', 0) == 'no' or tracking_info.get('bag', 0) == 'false':
-            bag = 'No Bag'
-        
+        cv2.putText(frame, f"Gender: {gender}", gender_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)        
 
         hat_bag_label_position = (rect_x + 7, rect_y + 60)
 
-        if bag == 'Bag' and hat == 'Hat':
-            cv2.putText(frame, f"{bag} {hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-        elif bag == 'No Bag' and hat == 'No Hat':
-            cv2.putText(frame, f"{bag} {hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-        elif bag == 'Bag' and hat == 'No Hat':
-            cv2.putText(frame, f"{bag}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-        elif hat == 'Hat' and bag == 'No Bag':
-            cv2.putText(frame, f"{hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-        else: 
-            cv2.putText(frame, f"{bag} {hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        if tracking_info.get('hat', 0) == 'yes' or tracking_info.get('hat', 0) == 'true':
+            if tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
+                cv2.putText(frame, f"Hat Bag", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+            else:
+                cv2.putText(frame, f"Hat", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        elif tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
+            cv2.putText(frame, f"Bag", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        else:
+            cv2.putText(frame, f"No Bag No Hat", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+
         if tracking_info.get("upper_color", 0) == 'tan':
             upper_color = 'Brown'
         elif tracking_info.get("upper_color", 0) == 'black and white':
@@ -394,23 +379,6 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
         cv2.putText(frame, f"U-L: {upper_color}-{lower_color}", color_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
 
     return frame
-
-# def plot_general_info(bbinfo, tracking_data, width, height):
-#     """
-#     Plot the general info box on the top left of the video.
-
-#     Parameters
-#     - bbinfo (list): List containing information about bounding boxes.
-#     - tracking_data (dict): Dictionary containing tracking information.
-#     - width (int): box width
-#     - height (int): box height
-#     """
-#     frame = cv2.rectangle(frame, (0, 0), (width, height), (255, 255, 255), -1)
-#     general_info = get_general_info(bbinfo, tracking_data)
-#     cv2.putText(frame, f'People in ROI: {general_info[0]}', (7, 30), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
-#     cv2.putText(frame, f'Total persons: {general_info[1]}', (7, 80), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
-#     cv2.putText(frame, f'Passages in ROI 1: {general_info[2]}', (7, 130), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
-#     cv2.putText(frame, f'Passages in ROI 2: {general_info[3]}', (7, 180), cv2.FONT_HERSHEY_DUPLEX, 1.0, (0, 0, 0), 2)
 
 def get_general_info(bbinfo, tracking_data):
 
@@ -432,13 +400,15 @@ def get_general_info(bbinfo, tracking_data):
 
     for info in bbinfo:
         tot_people = len(bbinfo)        
-        info = tracking_data.get(info[0], {})
+        person = tracking_data.get(info[0], {})
 
-        if info['roi1_flag'] or info['roi2_flag']:
+        if person['roi1_flag'] or person['roi2_flag']:
             people_in_roi += 1
         
-        roi1_passages += info['roi1_passages']
-        roi2_passages += info['roi2_passages']
+    for data in tracking_data:
+        details = tracking_data.get(data, {})    
+        roi1_passages += details['roi1_passages']
+        roi2_passages += details['roi2_passages']
 
     return [people_in_roi, tot_people, roi1_passages, roi2_passages]
             
