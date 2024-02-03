@@ -20,11 +20,6 @@ class MultiTaskMobileNetV2(nn.Module):
         # Load the pre-trained MobileNetV2 base
         self.base_model = models.mobilenet_v2()
 
-        # Freeze all layers up to the second-to-last layer
-        for name, param in self.base_model.named_parameters():
-            if not name.startswith('classifier') and not name.startswith('features.18'):  # Ignore the last fully connected layer
-                param.requires_grad = False
-
         # Modify the last fully connected layer to adapt to the tasks
         self.base_model.classifier[-1] = nn.Identity()
 
@@ -110,7 +105,9 @@ class MultiTaskPAR:
         Returns:
             tuple: Extracted attributes - gender, hat, bag, top color, bottom color.
         """
-        input_tensor = self.image_preprocessing(image).unsqueeze(0).to("cuda")
+        input_tensor = self.image_preprocessing(image).unsqueeze(0).to("cpu")
+
+        self.model.eval()
 
         with torch.no_grad():
             outputs = self.model(input_tensor)
