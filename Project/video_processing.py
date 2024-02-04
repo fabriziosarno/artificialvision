@@ -81,12 +81,17 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     start_count = False
     flag_par = False
 
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    frame_counter = 0
+
     # Adapting OpenCV video window
     cv2.namedWindow("YOLOv8 Tracking + PAR", cv2.WINDOW_KEEPRATIO)
 
     while True:
         # Read the next frame from the video
         success, frame = cap.read()
+
+        frame_counter += 1
 
         # Break the loop if no more frames
         if not success:
@@ -112,7 +117,8 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
             # If a new ID enters the scene before counter elapses, reset counter and logic
             par_counter = 0
             start_count = False
-
+        if frame_counter == (total_frames - 1):
+            flag_par = True
         # Update tracking data based on the current frame
         flag_par = update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par)
 
