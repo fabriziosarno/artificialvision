@@ -1,7 +1,6 @@
 import argparse, time
 from video_processing import *
 
-
 def main():  
 
     id_counter = 1
@@ -51,7 +50,7 @@ def main():
     fps = cap.get(cv2.CAP_PROP_FPS)
 
     # Process frames using YOLO, and PAR model
-    process_frames(yolo_model, par_model, cap, roi_manager, tracking_data, fps, mapper, id_counter)
+    process_frames(yolo_model, par_model, cap, roi_manager, tracking_data, mapper, id_counter)
 
     # Save tracking statistics to an output JSON file
     save_tracking_statistics(tracking_data, args.results, fps, mapper)
@@ -62,4 +61,4 @@ if __name__ == "__main__":
     main()
     end = time.time()
 
-    print(f"Execution time (sec - mins): {(end - start)} {round((end - start) / 60)}")
+    print(f"Execution time (sec/mins): {round(end - start)}/{round((end - start) / 60)}")

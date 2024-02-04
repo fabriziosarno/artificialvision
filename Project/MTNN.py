@@ -50,7 +50,6 @@ class MultiTaskMobileNetV2(nn.Module):
 
         return output_gender, output_hat, output_bag, output_top_color, output_bottom_color
 
-
 class MultiTaskPAR:
     """
     Multi-task wrapper for the MultiTaskMobileNetV2 model.

@@ -1,11 +1,9 @@
-import cv2, time, json, argparse, torch
+import cv2, json, torch
 from ultralytics import YOLO
 from roi import ROI
 from vilt import ViLTPAR
 from PIL import Image
 from MTNN import MultiTaskPAR
-
-import os
 
 def load_yolo(yolo_model_path):
     """
@@ -60,7 +58,7 @@ def open_video(video_path):
     return cap
 
 
-def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper, id_counter):
+def process_frames(yolo_model, par_model, cap, rois, tracking_data, mapper, id_counter):
     """
     Process frames from the video, update tracking data, and display the annotated frames.
 
@@ -74,12 +72,11 @@ def process_frames(yolo_model, par_model, cap, rois, tracking_data, fps, mapper,
     - mapper: data structure used to map used IDs
     - id_counter: counter of IDs
     """
-    # Number of frames to wait before updating tracking information
-    frames_to_wait = 30
+    frames_to_wait = 30   # Number of frames to wait before updating tracking information
     prev_id_counter = id_counter
     par_counter = 0
     start_count = False
-    flag_par = False
+    flag_par = False   # Flag to control PAR attribute extraction, set to True after waiting for frames_to_wait
 
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     frame_counter = 0
@@ -146,6 +143,9 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
     - rois (ROI): Instance of the ROI class containing region of interest information.
     - par_model: An instance of the ViltPAR or MultiTaskPAR for attribute extraction.
     - flag_par (bool): Flag to determine whether attribute extraction should be performed.
+
+    Returns:
+    - flag_par (bool): Flag to determine whether attribute extraction should be performed.
     """
 
     for info in bbinfo:
@@ -176,7 +176,7 @@ def update_data(frame, bbinfo, tracking_data, rois, par_model, flag_par):
 
         if flag_par:
             #Extraction of the crop for each person
-            cropped_frame = crop_objects(frame, obj_id, angles)
+            cropped_frame = crop_objects(frame, angles)
             attributes = par_model.extract_attributes(cropped_frame)
 
             # PAR attributes update
@@ -222,8 +222,6 @@ def update_roi_statistic(tracking_data, obj_id, roi):
     # Increment the persistence time
     tracking_data[obj_id][roi + str2] += 1
 
-
-
 def calculate_bbox_info(results, mapper, id_counter):
     """
     Calculate the information of bounding boxes given a results object.
@@ -238,11 +236,12 @@ def calculate_bbox_info(results, mapper, id_counter):
     - id_counter: final sequential ID number
     """
     bbinfo = []
+    cuda = torch.cuda.is_available() # Check if CUDA is available
 
     # Iterate through each detection in the YOLO results
     for result in results:
         # Extract bounding box information from the results
-        boxes = result.boxes.cpu().numpy()
+        boxes = result.boxes.to('cuda') if cuda else result.boxes.cpu().numpy()
 
         # Check if both xyxys and ids are non-empty
         if boxes.xyxy is None or boxes.id is None:
@@ -270,8 +269,6 @@ def calculate_bbox_info(results, mapper, id_counter):
             bbinfo.append((track_id_str, (cx, cy), (x1, y1, x2, y2)))
 
     return bbinfo, id_counter
-
-
 
 def plot_bboxes(bbinfo, tracking_data, frame, mapper):
     """
@@ -355,17 +352,27 @@ def plot_bboxes(bbinfo, tracking_data, frame, mapper):
         gender_label_position = (rect_x + 7, rect_y + 30)
         cv2.putText(frame, f"Gender: {gender}", gender_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)        
 
-        hat_bag_label_position = (rect_x + 7, rect_y + 60)
-
         if tracking_info.get('hat', 0) == 'yes' or tracking_info.get('hat', 0) == 'true':
-            if tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
-                cv2.putText(frame, f"Hat Bag", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-            else:
-                cv2.putText(frame, f"Hat", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
-        elif tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
-            cv2.putText(frame, f"Bag", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+            hat = 'Hat'
+        elif tracking_info.get('hat', 0) == 'no' or tracking_info.get('hat', 0) == 'false':
+            hat = 'No Hat'
         else:
-            cv2.putText(frame, f"No Bag No Hat", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+            hat = 'None'
+        
+        if tracking_info.get('bag', 0) == 'yes' or tracking_info.get('bag', 0) == 'true':
+            bag = 'Bag'
+        elif tracking_info.get('bag', 0) == 'no' or tracking_info.get('bag', 0) == 'false':
+            bag = 'No Bag'
+        else:
+            bag = 'None'
+        
+        hat_bag_label_position = (rect_x + 7, rect_y + 60)
+        if (hat == 'Hat' and bag == 'Bag') or (hat == 'None' and bag == 'None'):
+            cv2.putText(frame, f"{hat} {bag}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        elif hat == 'Hat' and bag == 'No Bag':
+            cv2.putText(frame, f"{hat}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
+        elif hat == 'No Hat' and bag == 'Bag':
+            cv2.putText(frame, f"{bag}", hat_bag_label_position, cv2.FONT_HERSHEY_DUPLEX, 0.8, (0, 0, 0), 2)
 
         if tracking_info.get("upper_color", 0) == 'tan':
             upper_color = 'Brown'
@@ -418,8 +425,7 @@ def get_general_info(bbinfo, tracking_data):
 
     return [people_in_roi, tot_people, roi1_passages, roi2_passages]
             
-
-def crop_objects(frame, id, angles):
+def crop_objects(frame, angles):
     """
     Utility function that crops the frame to obtain images of people detected in the scene.
 
@@ -504,5 +510,3 @@ def save_tracking_statistics(tracking_data, output_file, fps, mapper):
 
     with open(output_file, 'w') as json_file:
         json.dump(output_data, json_file, indent=2)
-
-
